@@ -64,7 +64,7 @@ button{background:#3268ed;font-weight:700;cursor:pointer}.muted{color:#9cafc9;fo
 <section class="card" style="margin-top:18px"><h2>Tipp-Historie</h2><button onclick="historyLoad()">Historie laden</button><div id="history" class="muted"></div></section>
 </main>
 <script>
-const API="http://localhost:8787"; let selectedFixture=null;
+const API="https://footballai-earj.onrender.com; let selectedFixture=null;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 date.value=new Date().toISOString().slice(0,10);
 
