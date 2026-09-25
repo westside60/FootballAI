@@ -1,0 +1,3 @@
+server/.env
+server/history.json
+server/node_modules/

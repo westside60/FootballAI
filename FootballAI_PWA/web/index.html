@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07101f"><link rel="manifest" href="manifest.json"><title>FootballAI Live</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#07101f;color:#eef4ff;font-family:system-ui,sans-serif}
+header{padding:18px 20px;border-bottom:1px solid #263653;background:#0b1528}main{max-width:1150px;margin:auto;padding:25px 20px}
+.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}.card{background:#0e192c;border:1px solid #263653;border-radius:16px;padding:18px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+input,select,button{width:100%;padding:12px;border-radius:10px;border:1px solid #344968;background:#091426;color:white}
+button{background:#3268ed;font-weight:700;cursor:pointer}.muted{color:#9cafc9;font-size:13px}.status{padding:9px;border-radius:9px;background:#091426;margin:8px 0}
+.match{padding:12px;margin:8px 0;background:#091426;border:1px solid #263653;border-radius:10px;cursor:pointer}.match:hover{border-color:#5f84d8}
+.chat{height:260px;overflow:auto;background:#091426;border-radius:12px;padding:10px}.msg{padding:9px;border-radius:10px;margin:7px;max-width:90%}.ai{background:#172742}.user{background:#2859c7;margin-left:auto}
+.tip{margin-top:14px;padding:15px;border-radius:12px;border-left:4px solid #ef6a6a;background:#091426}.green{border-color:#43d17a}.yellow{border-color:#f2bd4b}.big{font-size:30px;font-weight:900}
+@media(max-width:800px){.grid,.row,.row3{grid-template-columns:1fr}}
+</style></head>
+<body><header><b>⚽ FootballAI Live</b> · Fußballanalyse & Wettstatistik</header>
+<main>
+<h1>FootballAI</h1>
+<p class="muted">Echte Spiel-/Teamdaten im Backend. Bet365-Quoten werden über einen separaten Quoten-Datenanbieter eingebunden. Keine sichere Wette und keine automatische Wettabgabe.</p>
+<div id="status" class="status">Verbindung wird geprüft …</div>
+<div class="grid">
+<section class="card"><h2>Spiele</h2>
+<div class="row"><input id="date" type="date"><button onclick="loadFixtures()">Spiele laden</button></div>
+<div id="fixtures" class="muted" style="margin-top:12px">Noch keine Spiele geladen.</div>
+</section>
+<section class="card"><h2>Analyse</h2>
+<p id="selected" class="muted">Wähle links ein Spiel.</p>
+<div class="row3"><select id="market">
+<option>Über 1,5 Tore</option><option>Über 2,5 Tore</option><option>Unter 4,5 Tore</option>
+<option>Heimsieg</option><option>Auswärtssieg</option><option>Doppelte Chance 1X</option>
+</select><input id="odds" type="number" step=".01" placeholder="Bet365 Quote"><select id="risk">
+<option value="low">konservativ</option><option value="medium" selected>ausgewogen</option><option value="high">aggressiver</option>
+</select></div><br>
+<button onclick="analyzeSelected()">Live-Analyse starten</button><div id="result"></div>
+</section></div>
+
+<section class="card" style="margin-top:18px">
+<h2>🔎 Auto-Scanner</h2>
+<p class="muted">Der Scanner prüft verfügbare Spiele. Du gibst die aktuellen Quoten ein; nur Kandidaten oberhalb der gewählten Wahrscheinlichkeits- und Edge-Schwelle werden angezeigt.</p>
+<div class="row3">
+<input id="scanMinP" type="number" step=".01" value=".70" placeholder="Min. Wahrscheinlichkeit">
+<input id="scanMinE" type="number" step=".01" value=".08" placeholder="Min. Edge">
+<select id="scanMarket"><option>Über 1,5 Tore</option><option>Über 2,5 Tore</option><option>Unter 4,5 Tore</option><option>Heimsieg</option><option>Auswärtssieg</option><option>Doppelte Chance 1X</option></select>
+</div><br>
+<p class="muted">Für echte automatische Quoten werden wir im nächsten Schritt den Quotenanbieter direkt synchronisieren. Bis dahin ist der Scanner bewusst gegen von dir eingegebene Quoten abgesichert.</p>
+<button onclick="scan()">Alle verfügbaren Spiele scannen</button>
+<div id="scanResult"></div>
+</section>
+
+<section class="card" style="margin-top:18px">
+<h2>🚀 Live Auto-Scanner</h2>
+<p class="muted">Analysiert die Spiele und verwendet nur tatsächlich gelieferte Quoten. Wenn keine passende Quote vorhanden ist, wird das Spiel übersprungen.</p>
+<div class="row3">
+<input id="liveMinP" type="number" step=".01" value=".70" min=".01" max=".99" placeholder="Min. Wahrscheinlichkeit">
+<input id="liveMinE" type="number" step=".01" value=".08" min="0" max=".50" placeholder="Min. Edge">
+<select id="liveMarket"><option>Über 1,5 Tore</option><option>Über 2,5 Tore</option><option>Unter 4,5 Tore</option><option>Heimsieg</option><option>Auswärtssieg</option><option>Doppelte Chance 1X</option></select>
+</div><br>
+<button onclick="scanLive()">🔎 Live-Scanner starten</button>
+<div id="liveScanResult"></div>
+</section>
+<section class="card" style="margin-top:18px"><h2>FootballAI Chat</h2>
+<div id="chat" class="chat"><div class="msg ai">Wähle ein Spiel und starte eine Analyse. Ich kann keine 99%-Sicherheit garantieren.</div></div>
+<div class="row"><input id="q" placeholder="Deine Frage..." onkeydown="if(event.key==='Enter')ask()"><button onclick="ask()">Senden</button></div></section>
+<section class="card" style="margin-top:18px"><h2>Tipp-Historie</h2><button onclick="historyLoad()">Historie laden</button><div id="history" class="muted"></div></section>
+</main>
+<script>
+const API="http://localhost:8787"; let selectedFixture=null;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+date.value=new Date().toISOString().slice(0,10);
+
+async function health(){
+ try{let d=await(await fetch(API+"/api/health")).json();status.innerHTML=`Backend: <b>${d.mode}</b> · Fußball: ${d.footballProvider} · Quoten: ${esc(d.oddsProvider)}`;
+ }catch{status.textContent="Backend nicht erreichbar. Starte server/server.js."}}
+async function loadFixtures(){
+ fixtures.innerHTML="Lade Spiele …";
+ try{
+  let data=await(await fetch(API+"/api/fixtures?date="+encodeURIComponent(date.value))).json();
+  fixtures.innerHTML=data.length?data.map(f=>`<div class="match" onclick='selectFixture(${JSON.stringify(f)})'>
+  <b>${esc(f.teams.home.name)} – ${esc(f.teams.away.name)}</b><br><span class="muted">${new Date(f.fixture.date).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})} · ${esc(f.league.name)}</span></div>`).join(""):"Keine Spiele gefunden.";
+ }catch(e){fixtures.innerHTML=`Fehler: ${esc(e.message)}`}}
+function selectFixture(f){selectedFixture=f;selected.innerHTML=`<b>${esc(f.teams.home.name)} – ${esc(f.teams.away.name)}</b><br>Fixture-ID: ${f.fixture.id}<br><span class="muted">Trage die aktuelle Bet365-Quote für den gewählten Markt ein.</span>`}
+async function analyzeSelected(){
+ if(!selectedFixture){result.innerHTML="<div class='tip'>Bitte zuerst ein Spiel auswählen.</div>";return}
+ const o=Number(odds.value); if(!(o>1)){result.innerHTML="<div class='tip'>Bitte eine gültige Quote eingeben.</div>";return}
+ result.innerHTML="<p class='muted'>Live-Daten werden berechnet …</p>";
+ try{
+  const r=await fetch(API+"/api/analyze-fixture",{method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({fixtureId:selectedFixture.fixture.id,market:market.value,odds:o,risk:risk.value})});
+  const d=await r.json(); if(!r.ok) throw Error(d.error||"Analysefehler");
+  const c=d.decision==="BET"?"green":d.decision==="WATCH"?"yellow":"";
+  result.innerHTML=`<div class="tip ${c}"><b>${d.decision==="BET"?"🟢 Tipp-Kandidat":d.decision==="WATCH"?"🟡 Beobachten":"🔴 Kein Tipp"}</b>
+  <h3>${esc(d.home)} – ${esc(d.away)}</h3><div>${esc(d.market)}</div><div class="big">${Math.round(d.probability*100)} %</div>
+  <p>Faire Quote: ${d.fairOdds.toFixed(2)} · Bet365-Quote: ${d.odds.toFixed(2)} · Edge: ${d.edgePct.toFixed(1)} %-Pkt.</p>
+  <p>Modell: λ Heim ${d.model.homeXg.toFixed(2)} · λ Auswärts ${d.model.awayXg.toFixed(2)}<br>
+Verfügbarkeit: Heim ${d.model.availability.homeMissing} Ausfälle · Auswärts ${d.model.availability.awayMissing} Ausfälle ·
+Aufstellungen: ${d.model.availability.lineupKnown.home && d.model.availability.lineupKnown.away ? "bekannt" : "noch nicht vollständig"}</p>
+  <p>Historie: ${d.model.sample.homeMatches} Heimteam-Spiele / ${d.model.sample.awayMatches} Auswärtsteam-Spiele</p>
+  <small class="muted">${esc(d.dataStatus)} · Unsicherheit: ${esc(d.uncertainty)}</small></div>`;
+ }catch(e){result.innerHTML=`<div class="tip">Analyse nicht möglich: ${esc(e.message)}</div>`}}
+
+async function scan(){
+  scanResult.innerHTML="<p class='muted'>Scanner läuft …</p>";
+  try{
+    const d=await(await fetch(API+"/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        date:date.value,
+        markets:[scanMarket.value],
+        minProbability:Number(scanMinP.value),
+        minEdge:Number(scanMinE.value),
+        odds:{}
+      })})).json();
+    if(d.error) throw Error(d.error);
+    scanResult.innerHTML=`<p><b>${d.scannedFixtures}</b> Spiele geprüft · <b>${d.candidates.length}</b> Kandidaten</p>`+
+      (d.candidates.length?d.candidates.map(x=>`<div class="tip green"><b>🟢 Kandidat</b><br>
+      ${esc(x.home)} – ${esc(x.away)} · ${esc(x.market)}<br>
+      Modell: ${Math.round(x.probability*100)}% · faire Quote ${x.fairOdds.toFixed(2)} · Edge ${x.edgePct.toFixed(1)} %-Pkt.<br>
+      <span class="muted">${esc(x.league||"")} · ${new Date(x.kickoff).toLocaleString()}</span></div>`).join("")
+      :`<div class="tip yellow">Keine Kandidaten mit den aktuellen Schwellenwerten. Das ist beabsichtigt: lieber kein Tipp als ein erzwungener Tipp.</div>`);
+  }catch(e){scanResult.innerHTML=`<div class="tip">Scannerfehler: ${esc(e.message)}</div>`}
+}
+
+async function scanLive(){
+  liveScanResult.innerHTML="<p class='muted'>Live-Scanner läuft …</p>";
+  try{
+    const d=await(await fetch(API+"/api/scan-live",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({date:date.value,markets:[liveMarket.value],minProbability:Number(liveMinP.value),minEdge:Number(liveMinE.value)})})).json();
+    if(d.error) throw Error(d.error);
+    let body=`<p><b>${d.scannedFixtures}</b> Spiele geprüft · <b>${d.candidates.length}</b> Kandidaten</p>`;
+    if(d.candidates.length){
+      body+=d.candidates.map(x=>`<div class="tip green"><b>🟢 ${esc(x.bookmaker)} · ${esc(x.market)}</b><br>
+      ${esc(x.home)} – ${esc(x.away)}<br>
+      Wahrscheinlichkeit <b>${Math.round(x.probability*100)}%</b> · Quote <b>${x.odds.toFixed(2)}</b> · faire Quote ${x.fairOdds.toFixed(2)} · Edge <b>${x.edgePct.toFixed(1)} %-Pkt.</b><br>
+      <span class="muted">${esc(x.league||"")} · ${new Date(x.kickoff).toLocaleString()} · ${esc(x.source)}</span></div>`).join("");
+    } else body+=`<div class="tip yellow">Keine Kandidaten. Das Modell erzwingt keinen Tipp.</div>`;
+    if(d.skipped?.length) body+=`<p class="muted">${d.skipped.length} Spiele ohne passende Quote übersprungen.</p>`;
+    liveScanResult.innerHTML=body;
+  }catch(e){liveScanResult.innerHTML=`<div class="tip">Live-Scanner nicht verfügbar: ${esc(e.message)}</div>`}
+}
+function ask(){let x=q,qv=x.value.trim();if(!qv)return;chat.innerHTML+=`<div class="msg user">${esc(qv)}</div>`;
+let a=/99|garant|sicher/i.test(qv)?"Eine 99%-sichere Fußballwette kann seriös nicht garantiert werden. FootballAI soll Wahrscheinlichkeiten, Unsicherheit und Value transparent machen.":/xg/i.test(qv)?"Die aktuelle Live-v1 nutzt zunächst Tore und Gegentore aus den letzten 8 Spielen. xG-/Leistungsdaten, Aufstellungen und Verletzungsdaten werden bereits als Modellbausteine vorbereitet; die Kalibrierung folgt im Backtest.":"Nutze ein Spiel aus der Liste und gib die aktuelle Bet365-Quote des gewünschten Marktes ein.";
+chat.innerHTML+=`<div class="msg ai">${a}</div>`;x.value=""}
+async function historyLoad(){try{let d=await(await fetch(API+"/api/history")).json();history.innerHTML=d.length?d.map(x=>`<div class="tip">${esc(x.home)} – ${esc(x.away)} · ${esc(x.market)} · ${Math.round(x.probability*100)} % · ${x.decision}</div>`).join(""):"Noch keine Analysen."}catch{history.textContent="Backend nicht erreichbar."}}
+health();
+fetch(API+"/api/settings").then(r=>r.json()).then(x=>{
+  status.innerHTML += ` · Schwelle: ${Math.round(x.minProbability*100)}% / Edge ${Math.round(x.minEdge*100)}%`;
+}).catch(()=>{});
+loadFixtures();
+</script><script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+</script>
+</body></html>
